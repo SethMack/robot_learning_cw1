@@ -4,7 +4,7 @@
 
 # The window width and height in pixels, for both the "environment" window and the "planning" window.
 # If you wish, you can modify this according to the size of your screen.
-WINDOW_SIZE = 600
+WINDOW_SIZE = 300
 
 # The frame rate for pygame, which determines how quickly the program runs.
 # Specifically, this is the number of time steps per second that the robot will execute an action in the environment.
@@ -12,3 +12,8 @@ WINDOW_SIZE = 600
 FRAME_RATE = 10
 
 # You may want to add your own configuration variables here, depending on the algorithm you implement.
+NUM_DEMOS = 5
+EPISODE_LENGTH = 100
+LEARNING_RATE = 0.01
+NUM_TRAINING_EPOCHS = 1000
+MINIBATCH_SIZE = 10
