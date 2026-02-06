@@ -41,7 +41,7 @@ while running:
     curr_state = np.copy(environment.state)
     action, episode_done = robot.select_action(curr_state)
     # Draw the environment, and any visualisations, on the window
-    graphics.draw(environment, robot.planning_visualisation_lines, robot.model_visualisation_lines)
+    graphics.draw(environment, robot.planning_visualisation_lines, robot.model_visualisation_lines, robot.planning_visualisation_circles)
     # If the episode has finished, reset
     if episode_done:
         environment = Environment()

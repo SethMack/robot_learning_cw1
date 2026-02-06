@@ -28,7 +28,7 @@ class Graphics:
         self.clock = pygame.time.Clock()
 
     # Function to draw the environment, and any visualisations, on the window
-    def draw(self, environment, planning_visualisation_lines, model_visualisation_lines):
+    def draw(self, environment, planning_visualisation_lines, model_visualisation_lines, planning_visualisation_circles=[]):
         # Clear the screen
         self.screen.fill((0, 0, 0))
         # Draw the text along the top
@@ -58,6 +58,7 @@ class Graphics:
         self.draw_border(self.right_canvas)
         # Draw the visualisations
         self.draw_visualisation_lines(planning_visualisation_lines, model_visualisation_lines)
+        self.draw_visualisation_circles(planning_visualisation_circles)
         # Send the panels to the window
         self.screen.blit(self.left_canvas, (0, constants.WINDOW_HEADER))
         self.screen.blit(self.middle_canvas, (config.WINDOW_SIZE + constants.WINDOW_MARGIN, constants.WINDOW_HEADER))

@@ -41,12 +41,15 @@ class Robot:
         self.dynamics_model = DynamicsModel()
         self.replay_buffer = ReplayBuffer()
         self.num_episodes = 0
+        self.planning_visualisation_circles = []
 
     # Reset the robot at the start of an episode
     def reset(self):
         self.num_steps = 0
         self.planned_actions = []
         self.planning_visualisation_lines = []
+        self.planning_visualisation_circles = []
+        self.action_index = 0
 
     # Give the robot access to the goal state
     def set_goal_state(self, goal_state):
@@ -60,19 +63,32 @@ class Robot:
         
         # 2. Model-Based RL Phase
         else:
-            # Plan if we haven't already
-            if self.num_steps == 0:
+            # Plan if we haven't already OR if it's time to REPLAN
+            # Replan interval based on config.MPC_NUM_REPLANS
+            # If MPC_NUM_REPLANS is 0 (Open Loop), we plan once at step 0 (interval = 50)
+            # If MPC_NUM_REPLANS is 3, interval is 50 / 4 = 12.5 -> 12 steps
+            replan_interval = config.EPISODE_LENGTH / (config.MPC_NUM_REPLANS + 1)
+            
+            # Trigger planning
+            if self.num_steps % int(replan_interval) == 0:
                  # Train the model each episode
-                 print(f"Training model at start of episode {self.num_episodes}...")
-                 self.dynamics_model.train(self.replay_buffer, config.TRAIN_NUM_MINIBATCH)
+                 if self.num_steps == 0:
+                    print(f"Training model at start of episode {self.num_episodes}...")
+                    self.dynamics_model.train(self.replay_buffer, config.TRAIN_NUM_MINIBATCH)
                  
                  # Plan using the trained model
-                 print("Planning...")
+                 print(f"Planning at step {self.num_steps}...")
                  self.cem_planning(state)
+                 self.action_index = 0 # Reset action index for the new plan
+                 
+                 # VISUALISATION: Add a blue dot to show where we replanned
+                 hand_pos = self.forward_kinematics(state)[2]
+                 self.planning_visualisation_circles.append(VisualisationCircle(hand_pos[0], hand_pos[1], radius=0.01, colour=(0, 0, 255), panel='middle'))
             
             # Execute planned action
-            if self.num_steps < len(self.planned_actions):
-                action = self.planned_actions[self.num_steps]
+            if self.action_index < len(self.planned_actions):
+                action = self.planned_actions[self.action_index]
+                self.action_index += 1
             else:
                 action = np.zeros(2)
 
@@ -135,7 +151,7 @@ class Robot:
         self.planned_actions = action_mean[-1]
         
         # Visualisation: Draw the mean path for the final iteration
-        self.planning_visualisation_lines = []
+        # self.planning_visualisation_lines = []
         curr_state = state.copy()
         hand_pos_prev = self.forward_kinematics(curr_state)[2]
         
@@ -369,3 +385,14 @@ class VisualisationLine:
         self.y2 = y2
         self.colour = colour
         self.width = width
+
+
+# The VisualisationCircle class enables us to store a circle which will be drawn to the screen
+class VisualisationCircle:
+    # Initialise a new visualisation (a new circle)
+    def __init__(self, x, y, radius, colour, panel='middle'):
+        self.x = x
+        self.y = y
+        self.radius = radius
+        self.colour = colour
+        self.panel = panel

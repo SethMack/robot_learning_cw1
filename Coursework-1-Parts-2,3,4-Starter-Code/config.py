@@ -12,12 +12,16 @@ WINDOW_SIZE = 300
 FRAME_RATE = 100
 
 # You may want to add your own configuration variables here, depending on the algorithm you implement.
-EPISODE_LENGTH = 50
+EPISODE_LENGTH = 30
 TRAIN_MINIBATCH_SIZE = 32
-TRAIN_NUM_MINIBATCH = 500
+TRAIN_NUM_MINIBATCH = 350
 
 # CEM Parameters
 CEM_NUM_ITER = 10
 CEM_NUM_PATHS = 100
 CEM_NUM_ELITES = 10
 CEM_EPISODE_LENGTH = 20 # Planning horizon
+
+# MPC Parameters
+MPC_NUM_REPLANS = 2 # Set to 0 for Open-Loop (Baseline), 2 for Closed-Loop (Start + 2 intermediate)
+
