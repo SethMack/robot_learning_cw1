@@ -15,9 +15,8 @@ WINDOW_SIZE = 400
 # You may wish to slow this down to observe the robot's movement, or speed it up to run large-scale experiments.
 FRAME_RATE = 10
 
-# You may want to add your own configuration variables here, depending on the algorithm you implement.
 # CEM Parameters
-CEM_NUM_ITER = 10
-CEM_NUM_PATHS = 50
-CEM_EPISODE_LENGTH = 50
-CEM_NUM_ELITES = 5
+CEM_NUM_ITER = 20
+CEM_NUM_PATHS = 300
+CEM_EPISODE_LENGTH = 40
+CEM_NUM_ELITES = 30
