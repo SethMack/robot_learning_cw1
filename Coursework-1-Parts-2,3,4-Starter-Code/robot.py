@@ -45,6 +45,8 @@ class Robot:
     # Reset the robot at the start of an episode
     def reset(self):
         self.num_steps = 0
+        self.planned_actions = []
+        self.planning_visualisation_lines = []
 
     # Give the robot access to the goal state
     def set_goal_state(self, goal_state):
@@ -52,25 +54,103 @@ class Robot:
 
     # Function to get the next action in the plan
     def select_action(self, state):
-        # For now, a random action, biased towards 'moving right'
-        action = np.random.uniform(low=-constants.MAX_ACTION_MAGNITUDE, high=0.5*constants.MAX_ACTION_MAGNITUDE, size=2)
+        # 1. Random Data Collection Phase (First 5 episodes)
+        if self.num_episodes < 5:
+            action = np.random.uniform(low=-constants.MAX_ACTION_MAGNITUDE, high=constants.MAX_ACTION_MAGNITUDE, size=2)
+        
+        # 2. Model-Based RL Phase
+        else:
+            # Plan if we haven't already
+            if self.num_steps == 0:
+                 # Train the model each episode
+                 print(f"Training model at start of episode {self.num_episodes}...")
+                 self.dynamics_model.train(self.replay_buffer, config.TRAIN_NUM_MINIBATCH)
+                 
+                 # Plan using the trained model
+                 print("Planning...")
+                 self.cem_planning(state)
+            
+            # Execute planned action
+            if self.num_steps < len(self.planned_actions):
+                action = self.planned_actions[self.num_steps]
+            else:
+                action = np.zeros(2)
+
         self.num_steps += 1
-        # Determine whether to end the episode
-        if self.num_steps == config.EPISODE_LENGTH:
-            self.reset()
-            self.num_episodes += 1
+        
+        # Check if episode is done
+        if self.num_steps >= config.EPISODE_LENGTH:
             episode_done = True
-            if self.num_episodes % 20 == 0:
-                print("Training dynamics model on episode {}".format(self.num_episodes))
-                # Train the model on the buffer for a for epochs
-                self.dynamics_model.train(self.replay_buffer, config.TRAIN_NUM_MINIBATCH)
-                # Visualise the trained model
-                # self.create_model_visualisations() #TODO: implement this function
+            self.num_episodes += 1
+            if self.num_episodes == 5:
+                print("Switching to Model-Based RL...")
         else:
             episode_done = False
-        # Return the action, and a flag indicating if the episode has finished, to the main program loop
+            
         return action, episode_done
 
+    # Planning with cross-entropy method using the learned model
+    def cem_planning(self, state):
+        # Create some placeholders for the data
+        sampled_actions = np.zeros([config.CEM_NUM_ITER, config.CEM_NUM_PATHS, config.CEM_EPISODE_LENGTH, 2], dtype=np.float32)
+        action_mean = np.zeros([config.CEM_NUM_ITER, config.CEM_EPISODE_LENGTH, 2], dtype=np.float32)
+        action_std = np.zeros([config.CEM_NUM_ITER, config.CEM_EPISODE_LENGTH, 2], dtype=np.float32)
+        
+        # Loop over Iterations
+        for iter_num in range(config.CEM_NUM_ITER):
+            distances = np.zeros(config.CEM_NUM_PATHS, dtype=np.float32)
+            
+            # Loop over Paths
+            for path_num in range(config.CEM_NUM_PATHS):
+                curr_state = state.copy()
+                
+                # Loop over Steps
+                for step in range(config.CEM_EPISODE_LENGTH):
+                    # Sample Action
+                    if iter_num == 0:
+                        action = np.random.uniform(low=-constants.MAX_ACTION_MAGNITUDE, high=constants.MAX_ACTION_MAGNITUDE, size=2)
+                    else:
+                        action = np.random.normal(loc=action_mean[iter_num-1, step], scale=action_std[iter_num-1, step])
+                        action = np.clip(action, -constants.MAX_ACTION_MAGNITUDE, constants.MAX_ACTION_MAGNITUDE)
+                    
+                    sampled_actions[iter_num, path_num, step] = action
+                    
+                    # PREDICT Next State using the Learned Model
+                    next_state = self.dynamics_model.predict_next_state(curr_state, action)
+                    curr_state = next_state
+                
+                # Calculate Distance (using Forward Kinematics on the predicted state)
+                final_hand_pos = self.forward_kinematics(curr_state)[2]
+                distances[path_num] = np.linalg.norm(final_hand_pos - self.goal_state)
+            
+            # Select Elites
+            elites_indices = np.argsort(distances)[:config.CEM_NUM_ELITES]
+            elite_actions = sampled_actions[iter_num, elites_indices]
+            
+            # Update Mean and Std
+            action_mean[iter_num] = np.mean(elite_actions, axis=0)
+            action_std[iter_num] = np.std(elite_actions, axis=0)
+
+        # Set the planned actions
+        self.planned_actions = action_mean[-1]
+        
+        # Visualisation: Draw the mean path for the final iteration
+        self.planning_visualisation_lines = []
+        curr_state = state.copy()
+        hand_pos_prev = self.forward_kinematics(curr_state)[2]
+        
+        for step in range(config.CEM_EPISODE_LENGTH):
+            action = self.planned_actions[step]
+            next_state = self.dynamics_model.predict_next_state(curr_state, action)
+            hand_pos_curr = self.forward_kinematics(next_state)[2]
+            
+            self.planning_visualisation_lines.append(VisualisationLine(
+                hand_pos_prev[0], hand_pos_prev[1], 
+                hand_pos_curr[0], hand_pos_curr[1], 
+                colour=(0, 255, 0), width=0.005
+            ))
+            curr_state = next_state
+            hand_pos_prev = hand_pos_curr
 
     # Function to add a transition to the buffer
     def add_transition(self, state, action, next_state):
